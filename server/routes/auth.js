@@ -351,6 +351,11 @@ router.post('/login', [
     // Send login alert (optional, does not affect authentication)
     let userIP = req.headers["x-forwarded-for"] || req.ip;
     
+    // Clean up IP (take first IP if multiple in x-forwarded-for)
+    if (userIP.includes(',')) {
+      userIP = userIP.split(',')[0].trim();
+    }
+    
     // Handle localhost IPs - can't geolocate these
     const isLocalhost = userIP === '::1' || userIP === '127.0.0.1' || userIP === '::ffff:127.0.0.1';
     
@@ -365,26 +370,46 @@ router.post('/login', [
       location.country = "India"; // Default to India for local testing
       console.log('🏠 Localhost detected - using default location');
     } else {
+      console.log(`🔍 Looking up location for IP: ${userIP}`);
+      
+      // Try primary API: ipapi.co
       try {
-        // Clean up IP (take first IP if multiple in x-forwarded-for)
-        if (userIP.includes(',')) {
-          userIP = userIP.split(',')[0].trim();
-        }
-        
         const response = await axios.get(`https://ipapi.co/${userIP}/json/`, {
-          timeout: 5000 // 5 second timeout
+          timeout: 5000,
+          headers: { 'User-Agent': 'Password-Manager-Node' }
         });
         
-        if (response.data && !response.data.error) {
+        console.log('📡 IP API Response:', JSON.stringify(response.data).substring(0, 200));
+        
+        if (response.data && !response.data.error && response.data.city) {
           location.city = response.data.city || "Unknown";
           location.country = response.data.country_name || "Unknown";
-          console.log(`📍 Location detected: ${location.city}, ${location.country}`);
+          console.log(`📍 Location detected (ipapi.co): ${location.city}, ${location.country}`);
         } else {
-          console.log('⚠️ IP API returned error, using Unknown location');
+          throw new Error('Invalid response from ipapi.co');
         }
-      } catch (e) {
-        console.error("IP lookup failed:", e.message);
-        // Keep default "Unknown" location
+      } catch (primaryError) {
+        console.warn(`⚠️ Primary IP API failed: ${primaryError.message}`);
+        
+        // Try fallback API: ip-api.com (free, no rate limit for non-commercial)
+        try {
+          const fallbackResponse = await axios.get(`http://ip-api.com/json/${userIP}`, {
+            timeout: 5000
+          });
+          
+          console.log('📡 Fallback API Response:', JSON.stringify(fallbackResponse.data).substring(0, 200));
+          
+          if (fallbackResponse.data && fallbackResponse.data.status === 'success') {
+            location.city = fallbackResponse.data.city || "Unknown";
+            location.country = fallbackResponse.data.country || "Unknown";
+            console.log(`📍 Location detected (ip-api.com): ${location.city}, ${location.country}`);
+          } else {
+            console.error('❌ Fallback API also failed');
+          }
+        } catch (fallbackError) {
+          console.error(`❌ Fallback IP lookup failed: ${fallbackError.message}`);
+          // Keep default "Unknown" location
+        }
       }
     }
 
@@ -845,28 +870,60 @@ router.post('/verify-login-otp', async (req, res) => {
     await user.save();
 
     // Inside router.post('/verify-login-otp', ...)
-// After: await user.save(); (The part where you clear the OTP)
+    // After: await user.save(); (The part where you clear the OTP)
 
-// 1. Capture the real User IP from the Hugging Face proxy
-    const userIP = req.headers["x-forwarded-for"]?.split(',')[0] || req.ip;
+    // 1. Capture the real User IP from the Hugging Face proxy
+    const userIP = req.headers["x-forwarded-for"]?.split(',')[0]?.trim() || req.ip;
 
-// 2. Initialize location as Unknown
+    // 2. Initialize location as Unknown
     let location = { city: "Unknown", country: "Unknown" }; 
-
-    try {
-    // 3. Attempt to fetch live geolocation data
-      const response = await axios.get(`https://ipapi.co/${userIP}/json/`);
     
-    // 4. Only update if the API returns valid data
-        if (response.data && !response.data.error) {
+    // Handle localhost
+    const isLocalhost = userIP === '::1' || userIP === '127.0.0.1' || userIP === '::ffff:127.0.0.1';
+    
+    if (isLocalhost) {
+      location.city = "Local Network";
+      location.country = "India";
+      console.log('🏠 Localhost detected - OTP verification');
+    } else {
+      console.log(`🔍 Looking up location for IP (OTP verify): ${userIP}`);
+      
+      try {
+        // 3. Attempt to fetch live geolocation data from primary API
+        const response = await axios.get(`https://ipapi.co/${userIP}/json/`, {
+          timeout: 5000,
+          headers: { 'User-Agent': 'Password-Manager-Node' }
+        });
+        
+        // 4. Only update if the API returns valid data
+        if (response.data && !response.data.error && response.data.city) {
           location.city = response.data.city || "Unknown";
           location.country = response.data.country_name || "Unknown";
+          console.log(`📍 Location detected (OTP): ${location.city}, ${location.country}`);
+        } else {
+          throw new Error('Invalid response from ipapi.co');
         }
-      } catch (e) {
-    console.error("IP lookup failed:", e.message);
+      } catch (primaryError) {
+        console.warn(`⚠️ Primary IP API failed (OTP): ${primaryError.message}`);
+        
+        // Try fallback API
+        try {
+          const fallbackResponse = await axios.get(`http://ip-api.com/json/${userIP}`, {
+            timeout: 5000
+          });
+          
+          if (fallbackResponse.data && fallbackResponse.data.status === 'success') {
+            location.city = fallbackResponse.data.city || "Unknown";
+            location.country = fallbackResponse.data.country || "Unknown";
+            console.log(`📍 Location detected (OTP - fallback): ${location.city}, ${location.country}`);
+          }
+        } catch (fallbackError) {
+          console.error(`❌ Fallback IP lookup failed (OTP): ${fallbackError.message}`);
+        }
+      }
     }
 
-// 5. Pass the fetched location to the alert function
+    // 5. Pass the fetched location to the alert function
     const agent = useragent.parse(req.headers["user-agent"]);
     const device = `${agent.family} on ${agent.os.family}`;
 
