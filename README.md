@@ -56,20 +56,17 @@ A **Privacy-Preserving, Zero-Knowledge Password Manager** with **Risk-Adaptive A
 
 ### **Project Structure**
 ```
-├── pwdmgr/
-│   ├── login-standalone-with-otp.html   # Main login with risk assessment
-│   ├── face-auth-standalone.html         # Face recognition page
-│   ├── dashboard-standalone.html         # Password vault
-│   ├── settings-standalone.html          # User settings
-│   ├── config.js                         # API endpoint configuration
-│   ├── server/
-│   │   ├── server.js                     # Node.js Express server
-│   │   ├── routes/auth.js                # Authentication endpoints
-│   │   ├── models/User.js                # User schema
-│   │   └── deepface_backend.py           # Face recognition API
-│   └── client/                           # React build (alternative interface)
-├── .gitignore
-└── README.md
+├── login-standalone-with-otp.html   # Main login with risk assessment
+├── face-auth-standalone.html        # Face recognition page
+├── dashboard-standalone.html        # Password vault
+├── settings-standalone.html         # User settings
+├── config.js                        # API endpoint configuration
+├── server/
+│   ├── server.js                    # Node.js Express server
+│   ├── routes/auth.js               # Authentication endpoints
+│   ├── models/User.js               # User schema
+│   └── deepface_backend.py          # Face recognition API
+└── client/                          # React build (alternative interface)
 ```
 
 ## 🚀 Getting Started
@@ -89,17 +86,18 @@ cd Risk-Adaptive-Password-Manager
 
 2. **Install Node.js dependencies**
 ```bash
-cd pwdmgr/server
+cd server
 npm install
 ```
 
 3. **Install Python dependencies**
 ```bash
+cd server
 pip install -r requirements.txt
 ```
 
 4. **Configure environment variables**
-Create `.env` file in `pwdmgr/server/`:
+Create `.env` file in `server/`:
 ```env
 MONGODB_URI=your_mongodb_atlas_uri
 JWT_SECRET=your_jwt_secret
@@ -107,7 +105,7 @@ BREVO_API_KEY=your_brevo_api_key
 ```
 
 5. **Update API endpoints**
-Edit `pwdmgr/config.js` with your deployment URLs:
+Edit `config.js` with your deployment URLs:
 ```javascript
 PRODUCTION: {
     API_BASE_URL: 'https://your-node-backend.com',
@@ -119,18 +117,19 @@ PRODUCTION: {
 
 1. **Start Node.js server**
 ```bash
-cd pwdmgr/server
+cd server
 node server.js
 ```
 
 2. **Start Python DeepFace backend**
 ```bash
+cd server
 python deepface_backend.py
 ```
 
 3. **Open in browser**
 ```
-http://localhost:5000/pwdmgr/login-standalone-with-otp.html
+http://localhost:5000/login-standalone-with-otp.html
 ```
 
 ## 📊 Risk Assessment Algorithm
@@ -205,10 +204,10 @@ AuthSimulator.runFullSimulation('user@example.com');
 
 ## 📝 Documentation
 
-- [INTEGRATION_ANALYSIS.md](pwdmgr/INTEGRATION_ANALYSIS.md) - Complete compatibility analysis
-- [QUICK_SUMMARY.md](pwdmgr/QUICK_SUMMARY.md) - Project overview
-- [FEATURE_CHECKLIST.md](pwdmgr/FEATURE_CHECKLIST.md) - All 34+ features
-- [PROJECT_REVIEW_1_DOCUMENTATION.md](pwdmgr/PROJECT_REVIEW_1_DOCUMENTATION.md) - Architecture details
+- [INTEGRATION_ANALYSIS.md](INTEGRATION_ANALYSIS.md) - Complete compatibility analysis
+- [QUICK_SUMMARY.md](QUICK_SUMMARY.md) - Project overview
+- [FEATURE_CHECKLIST.md](FEATURE_CHECKLIST.md) - All 34+ features
+- [PROJECT_REVIEW_1_DOCUMENTATION.md](PROJECT_REVIEW_1_DOCUMENTATION.md) - Architecture details
 
 ## 🎓 Academic Context
 
