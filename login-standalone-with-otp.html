@@ -228,6 +228,17 @@
             to { transform: rotate(360deg); }
         }
 
+        @keyframes pulse {
+            0%, 100% { 
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 0.95;
+                transform: scale(1.002);
+            }
+        }
+
         .footer {
             text-align: center;
             margin-top: 24px;
@@ -483,6 +494,9 @@
                 <p class="subtitle">We've sent a 6-digit code to <strong id="userEmail"></strong></p>
             </div>
 
+            <!-- Dynamic Risk Explanation for OTP -->
+            <div id="otpRiskExplanation"></div>
+
             <div id="otpErrorAlert" class="alert alert-error">
                 <svg fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
@@ -693,7 +707,7 @@
             }, 1000);
         }
 
-        function switchToOtpStep(email) {
+        function switchToOtpStep(email, explanation = null) {
             loginStep.classList.add('hidden');
             otpStep.classList.remove('hidden');
             userEmailDisplay.textContent = email;
@@ -701,6 +715,36 @@
             otpInput.focus();
             startOtpTimer();
             startResendCooldown();
+            
+            // Display dynamic explanation for why OTP is required
+            if (explanation) {
+                const otpExplanationDiv = document.getElementById('otpRiskExplanation');
+                otpExplanationDiv.innerHTML = `
+                    <div style="background: linear-gradient(135deg, #f59e0b15 0%, #f59e0b08 100%); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                        <div style="display: flex; align-items: start; gap: 12px;">
+                            <div style="font-size: 24px; line-height: 1;">🔐</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #111827; margin-bottom: 8px;">Why Email OTP is Required</div>
+                                <div style="color: #4b5563; font-size: 14px; line-height: 1.6;">${explanation.otpMessage || explanation.message}</div>
+                                ${explanation.specificReasons ? `
+                                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #f59e0b30;">
+                                        <div style="color: #6b7280; font-size: 13px; font-weight: 500; margin-bottom: 6px;">Detected Risk Factors:</div>
+                                        <ul style="margin: 0; padding-left: 20px; color: #6b7280; font-size: 13px; line-height: 1.8;">
+                                            ${explanation.specificReasons.map(r => `<li>${r}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                                <div style="color: #9ca3af; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>This assessment was performed on your device. No behavioral data was sent to our servers.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         function switchToLoginStep() {
@@ -1104,26 +1148,49 @@
         class ExplainableAuth {
             static explainAuthDecision(riskAssessment, challengeLevel) {
                 const reasons = [];
+                const specificReasons = [];
+                const riskDetails = [];
 
                 if (riskAssessment.device === 'HIGH') {
                     reasons.push('new or unfamiliar device');
+                    specificReasons.push('Your device fingerprint doesn\'t match previous successful logins');
+                    riskDetails.push({ factor: 'Device', status: 'HIGH', icon: '🖥️' });
+                } else if (riskAssessment.device === 'MEDIUM') {
+                    riskDetails.push({ factor: 'Device', status: 'MEDIUM', icon: '🖥️' });
                 }
+                
                 if (riskAssessment.behavior === 'HIGH') {
                     reasons.push('unusual typing behavior');
+                    specificReasons.push('Your typing pattern differs significantly from your baseline');
+                    riskDetails.push({ factor: 'Typing Pattern', status: 'HIGH', icon: '⌨️' });
+                } else if (riskAssessment.behavior === 'MEDIUM') {
+                    riskDetails.push({ factor: 'Typing Pattern', status: 'MEDIUM', icon: '⌨️' });
                 }
+                
                 if (riskAssessment.time === 'HIGH') {
                     reasons.push('unusual time of day');
+                    specificReasons.push('You rarely log in at this time. This login is outside your normal hours');
+                    riskDetails.push({ factor: 'Login Time', status: 'HIGH', icon: '🕐' });
+                } else if (riskAssessment.time === 'MEDIUM') {
+                    riskDetails.push({ factor: 'Login Time', status: 'MEDIUM', icon: '🕐' });
                 }
+                
                 if (riskAssessment.credential === 'HIGH') {
                     reasons.push('recent failed login attempts');
+                    specificReasons.push('Multiple failed login attempts detected recently on your account');
+                    riskDetails.push({ factor: 'Login History', status: 'HIGH', icon: '⚠️' });
+                } else if (riskAssessment.credential === 'MEDIUM') {
+                    riskDetails.push({ factor: 'Login History', status: 'MEDIUM', icon: '⚠️' });
                 }
 
                 if (reasons.length === 0) {
                     return {
                         level: challengeLevel,
                         title: '✅ Standard Authentication',
-                        message: 'Everything looks normal. Standard authentication required.',
-                        reasons: ['Familiar device', 'Normal behavior', 'Expected time']
+                        message: 'Everything looks normal! Your device is recognized, your behavior matches your profile, and you\'re logging in at a typical time.',
+                        reasons: ['Familiar device', 'Normal behavior', 'Expected time'],
+                        specificReasons: [],
+                        riskDetails: []
                     };
                 }
 
@@ -1134,12 +1201,31 @@
                     4: 'Password + Face + TOTP'
                 };
 
+                // Create detailed messages based on challenge level and risk factors
+                let detailedMessage = '';
+                let otpMessage = '';
+                let faceMessage = '';
+                
+                if (challengeLevel === 2) {
+                    otpMessage = `We've detected ${reasons.length === 1 ? 'a' : 'multiple'} unusual factor${reasons.length > 1 ? 's' : ''} in this login attempt. To protect your account, we need to verify your identity with a code sent to your email.`;
+                    detailedMessage = `For your security, we're requesting email verification because we detected: ${reasons.join(', ')}.`;
+                } else if (challengeLevel === 3) {
+                    faceMessage = `This login shows ${reasons.length} suspicious pattern${reasons.length > 1 ? 's' : ''}. We need facial recognition to ensure it's really you trying to access your account.`;
+                    detailedMessage = `Due to ${reasons.join(' + ')}, we need biometric verification for this login.`;
+                } else if (challengeLevel === 4) {
+                    detailedMessage = `Critical security alert: ${reasons.join(' + ')}. Multiple authentication factors required.`;
+                }
+
                 return {
                     level: challengeLevel,
-                    title: `🔐 Enhanced Security Required`,
-                    message: `Due to ${reasons.join(' + ')}, we need additional verification.`,
+                    title: challengeLevel >= 3 ? '🚨 High-Risk Login Detected' : '🔐 Enhanced Security Required',
+                    message: detailedMessage || `Due to ${reasons.join(' + ')}, we need additional verification.`,
+                    otpMessage,
+                    faceMessage,
                     challenge: challengeNames[challengeLevel],
                     reasons,
+                    specificReasons,
+                    riskDetails,
                     privacyNote: 'This assessment was performed entirely on your device. No behavioral data was sent to our servers.'
                 };
             }
@@ -1152,13 +1238,56 @@
                     4: '#dc2626'
                 };
 
+                const icons = {
+                    1: '✅',
+                    2: '🔐',
+                    3: '🚨',
+                    4: '⚠️'
+                };
+
+                // Show risk details if available
+                let riskDetailsHtml = '';
+                if (explanation.riskDetails && explanation.riskDetails.length > 0) {
+                    const statusColors = {
+                        'HIGH': '#ef4444',
+                        'MEDIUM': '#f59e0b',
+                        'LOW': '#10b981'
+                    };
+                    
+                    riskDetailsHtml = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid ${colors[explanation.level]}30;">
+                            <div style="color: #6b7280; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Risk Assessment Breakdown:</div>
+                            <div style="display: grid; gap: 6px;">
+                                ${explanation.riskDetails.map(risk => `
+                                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+                                        <span style="color: #4b5563;">${risk.icon} ${risk.factor}</span>
+                                        <span style="background: ${statusColors[risk.status]}20; color: ${statusColors[risk.status]}; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 11px;">${risk.status}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
                 return `
-                    <div style="background: ${colors[explanation.level]}15; border-left: 4px solid ${colors[explanation.level]}; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                        <div style="font-weight: 600; color: #111827; margin-bottom: 8px;">${explanation.title}</div>
-                        <div style="color: #4b5563; font-size: 14px; margin-bottom: 8px;">${explanation.message}</div>
-                        ${explanation.challenge ? `<div style="color: #6b7280; font-size: 13px; margin-top: 8px;">Required: ${explanation.challenge}</div>` : ''}
-                        <div style="color: #9ca3af; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
-                            🔒 ${explanation.privacyNote || 'Your data stays on your device.'}
+                    <div style="background: linear-gradient(135deg, ${colors[explanation.level]}15 0%, ${colors[explanation.level]}08 100%); border-left: 4px solid ${colors[explanation.level]}; padding: 16px; border-radius: 8px; margin: 16px 0; box-shadow: 0 2px 8px ${colors[explanation.level]}15;">
+                        <div style="display: flex; align-items: start; gap: 12px;">
+                            <div style="font-size: 24px; line-height: 1;">${icons[explanation.level]}</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #111827; margin-bottom: 8px;">${explanation.title}</div>
+                                <div style="color: #4b5563; font-size: 14px; line-height: 1.6; margin-bottom: 8px;">${explanation.message}</div>
+                                ${explanation.challenge ? `<div style="background: rgba(255,255,255,0.6); padding: 10px; border-radius: 6px; margin-top: 10px;">
+                                    <div style="color: #111827; font-size: 13px; font-weight: 600;">📋 Required Authentication:</div>
+                                    <div style="color: #4b5563; font-size: 14px; margin-top: 4px;">${explanation.challenge}</div>
+                                </div>` : ''}
+                                ${riskDetailsHtml}
+                                <div style="color: #9ca3af; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>${explanation.privacyNote || 'Your data stays on your device.'}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1490,12 +1619,42 @@
 
                     window.location.href = 'dashboard-standalone.html';
                 } else if (data.requiresEmailOTP) {
-                    // Switch to OTP verification step
-                    switchToOtpStep(userEmail);
+                    // Switch to OTP verification step with explanation
+                    switchToOtpStep(userEmail, explanation);
                 } else if (data.requires2FA) {
                     // Redirect to 2FA page (if you have one)
                     showError('2FA required - please use settings page to complete login');
                 } else if (data.requiresFaceAuth) {
+                    // Show dynamic face auth message before redirect
+                    const existingExplanation = document.getElementById('riskExplanation');
+                    if (existingExplanation) {
+                        existingExplanation.innerHTML = `
+                            <div style="background: linear-gradient(135deg, #ef444415 0%, #ef444408 100%); border-left: 4px solid #ef4444; padding: 20px; border-radius: 8px; margin: 16px 0; animation: pulse 2s ease-in-out infinite;">
+                                <div style="display: flex; align-items: start; gap: 12px;">
+                                    <div style="font-size: 32px; line-height: 1;">🚨</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 700; color: #111827; font-size: 18px; margin-bottom: 8px;">High-Risk Login - Facial Recognition Required</div>
+                                        <div style="color: #4b5563; font-size: 15px; line-height: 1.6; margin-bottom: 12px;">${explanation.faceMessage || 'We detected unusual activity that requires biometric verification.'}</div>
+                                        ${explanation.specificReasons && explanation.specificReasons.length > 0 ? `
+                                            <div style="background: rgba(255,255,255,0.6); padding: 12px; border-radius: 6px; margin: 12px 0;">
+                                                <div style="color: #6b7280; font-size: 13px; font-weight: 600; margin-bottom: 8px;">🔍 Why facial recognition is needed:</div>
+                                                <ul style="margin: 0; padding-left: 20px; color: #4b5563; font-size: 13px; line-height: 2;">
+                                                    ${explanation.specificReasons.map(r => `<li>${r}</li>`).join('')}
+                                                </ul>
+                                            </div>
+                                        ` : ''}
+                                        <div style="color: #111827; font-size: 14px; font-weight: 600; margin-top: 12px; padding: 12px; background: #fef2f2; border-radius: 6px; text-align: center;">
+                                            ⏱️ Redirecting to facial recognition in 3 seconds...
+                                        </div>
+                                        <div style="color: #9ca3af; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                                            🔒 All risk analysis was performed on your device. Your privacy is protected.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
                     // CRITICAL: Store context before redirecting to face auth
                     // Face auth page will need email for verification
                     sessionStorage.setItem('pendingLoginEmail', userEmail);
@@ -1503,11 +1662,14 @@
                         email: userEmail,
                         timestamp: Date.now(),
                         challengeLevel: challengeLevel,
-                        fromRiskAssessment: true
+                        fromRiskAssessment: true,
+                        explanation: explanation
                     }));
                     
-                    // Redirect to face auth page
-                    window.location.href = 'face-auth-standalone.html?mode=verify';
+                    // Redirect to face auth page after 3 seconds
+                    setTimeout(() => {
+                        window.location.href = 'face-auth-standalone.html?mode=verify';
+                    }, 3000);
                 } else {
                     throw new Error(data.message || 'Login failed');
                 }
