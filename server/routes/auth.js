@@ -349,17 +349,43 @@ router.post('/login', [
     await user.save();
 
     // Send login alert (optional, does not affect authentication)
-    const userIP = req.headers["x-forwarded-for"] || req.ip;
+    let userIP = req.headers["x-forwarded-for"] || req.ip;
+    
+    // Handle localhost IPs - can't geolocate these
+    const isLocalhost = userIP === '::1' || userIP === '127.0.0.1' || userIP === '::ffff:127.0.0.1';
+    
     const agent = useragent.parse(req.headers["user-agent"]);
     const device = `${agent.family} on ${agent.os.family}`;
 
     let location = { city: "Unknown", country: "Unknown" };
-    try {
-      const response = await axios.get(`https://ipapi.co/${userIP}/json/`);
-      location.city = response.data.city || "Unknown";
-      location.country = response.data.country_name || "Unknown";
-    } catch (e) {
-      console.error("IP lookup failed:", e.message);
+    
+    if (isLocalhost) {
+      // For localhost, use a default location or skip IP lookup
+      location.city = "Local Network";
+      location.country = "India"; // Default to India for local testing
+      console.log('🏠 Localhost detected - using default location');
+    } else {
+      try {
+        // Clean up IP (take first IP if multiple in x-forwarded-for)
+        if (userIP.includes(',')) {
+          userIP = userIP.split(',')[0].trim();
+        }
+        
+        const response = await axios.get(`https://ipapi.co/${userIP}/json/`, {
+          timeout: 5000 // 5 second timeout
+        });
+        
+        if (response.data && !response.data.error) {
+          location.city = response.data.city || "Unknown";
+          location.country = response.data.country_name || "Unknown";
+          console.log(`📍 Location detected: ${location.city}, ${location.country}`);
+        } else {
+          console.log('⚠️ IP API returned error, using Unknown location');
+        }
+      } catch (e) {
+        console.error("IP lookup failed:", e.message);
+        // Keep default "Unknown" location
+      }
     }
 
     sendLoginAlert(user.email, userIP, device, location).catch(console.error);

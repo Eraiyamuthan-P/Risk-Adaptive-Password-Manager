@@ -1293,6 +1293,59 @@
         window.RiskAdaptiveAuth = RiskAdaptiveAuth;
         window.ExplainableAuth = ExplainableAuth;
 
+        /**
+         * DEVICE FINGERPRINT DEBUGGER
+         * Helps diagnose why your device is not being recognized
+         */
+        window.DeviceDebug = {
+            async checkDeviceFingerprint(email) {
+                console.log('═══════════════════════════════════════════════');
+                console.log('🔍 DEVICE FINGERPRINT DIAGNOSTIC');
+                console.log('═══════════════════════════════════════════════');
+                
+                const currentFingerprint = await DeviceRiskModule.generateFingerprint();
+                console.log('Current Device Fingerprint:', currentFingerprint);
+                
+                const storageKey = `device_profile_${email}`;
+                const profile = JSON.parse(localStorage.getItem(storageKey) || '{"devices": []}');
+                
+                console.log('\nStored Devices:', profile.devices.length);
+                profile.devices.forEach((device, index) => {
+                    const match = device.fingerprint === currentFingerprint ? '✅ MATCH' : '❌ NO MATCH';
+                    console.log(`\nDevice ${index + 1}: ${match}`);
+                    console.log('  Fingerprint:', device.fingerprint);
+                    console.log('  First Seen:', new Date(device.firstSeen).toLocaleString());
+                    console.log('  Last Seen:', new Date(device.lastSeen).toLocaleString());
+                    console.log('  Login Count:', device.loginCount);
+                });
+                
+                if (!profile.devices.find(d => d.fingerprint === currentFingerprint)) {
+                    console.log('\n⚠️ YOUR DEVICE IS NOT RECOGNIZED!');
+                    console.log('This is why you are being asked for additional authentication.');
+                    console.log('\nDevice Fingerprint Components:');
+                    console.log('  User Agent:', navigator.userAgent);
+                    console.log('  Language:', navigator.language);
+                    console.log('  Screen:', screen.width + 'x' + screen.height);
+                    console.log('  Color Depth:', screen.colorDepth);
+                    console.log('  Timezone Offset:', new Date().getTimezoneOffset());
+                    console.log('  CPU Cores:', navigator.hardwareConcurrency);
+                    console.log('\n💡 TIP: If you changed browser, screen resolution, or cleared');
+                    console.log('   browser data, your device fingerprint will change.');
+                } else {
+                    console.log('\n✅ YOUR DEVICE IS RECOGNIZED!');
+                }
+                
+                console.log('═══════════════════════════════════════════════');
+                return { currentFingerprint, storedDevices: profile.devices };
+            },
+            
+            async forceRegisterDevice(email) {
+                console.log('🔧 Force registering current device...');
+                await DeviceRiskModule.recordDeviceLogin(email);
+                console.log('✅ Device registered! Try logging in again.');
+            }
+        };
+
         // Initialize behavioral biometrics capture
         const biometrics = new BehavioralBiometrics();
         let typingSample = null;
