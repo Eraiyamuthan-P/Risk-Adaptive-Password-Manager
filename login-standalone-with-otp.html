@@ -979,8 +979,8 @@
                 const day = now.getDay();
 
                 const profile = this.loadProfile(email);
-                if (!profile || profile.totalLogins < 10) {
-                    console.log('[TimeRisk] 📊 Building temporal profile → MEDIUM risk');
+                if (!profile || profile.totalLogins < 3) {
+                    console.log('[TimeRisk] 📊 Building temporal profile (need 3+ logins) → MEDIUM risk');
                     return 'MEDIUM';
                 }
 

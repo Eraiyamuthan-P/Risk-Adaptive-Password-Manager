@@ -3,6 +3,19 @@
 ## 🎯 Overview
 This guide helps you test the risk-adaptive authentication system from scratch by clearing all previous login behaviors.
 
+## 📚 Understanding the Learning Phase
+
+**Important:** The system uses **behavioral profiling** to learn your patterns:
+- 🧠 **First 3 Logins**: System is learning (asks for Email OTP as precaution)
+- ✅ **After 3 Logins**: Profile built → Password-only for normal behavior
+- 🚨 **Anomalies Detected**: System adapts and requests additional verification
+
+**Why 3 logins?**
+- ⌨️ **Typing Pattern**: Needs 3+ samples to establish your baseline
+- ⏰ **Login Time**: Needs 3+ logins to recognize your usual times
+
+This is **intentional security** - the system doesn't trust you until it knows you!
+
 ---
 
 ## 📋 Quick Start
@@ -49,13 +62,15 @@ Reset in MongoDB `User` document:
 
 **Goal:** Familiar device, normal behavior → Password-only authentication
 
+**⚠️ LEARNING PHASE:** System needs **3 successful logins** to build your behavioral profile (typing patterns + login times). During the first 3 logins, it will ask for Email OTP as a security precaution.
+
 **Steps:**
 1. Clear data for: `test@example.com`
-2. Login successfully 2-3 times from same browser
-3. Close browser and reopen
-4. Login again with correct password
+2. **Login #1-3:** Enter password → Will ask for Email OTP (this is normal during learning phase)
+3. After 3rd successful login, **your profile is built**
+4. **Login #4+:** Should get password-only authentication (Level 1)
 
-**Expected Result:**
+**Expected Result (After 3+ Logins):**
 ```
 ✅ Standard Authentication
 Everything looks normal! Your device is recognized...
@@ -63,8 +78,8 @@ Everything looks normal! Your device is recognized...
 Challenge Level: 1 (Password Only)
 Risk Factors:
   Device: LOW
-  Typing Pattern: LOW
-  Login Time: LOW
+  Typing Pattern: LOW (profile built from 3+ samples)
+  Login Time: LOW (profile built from 3+ logins)
   Login History: LOW
 
 → Should log in directly without OTP or Face Auth
