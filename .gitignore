@@ -1,0 +1,52 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+server/.env
+
+# Node Modules
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Build Output
+build/
+dist/
+client/build/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary Files
+*.tmp
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Face Recognition Data (if sensitive)
+# face_embedding.npy
+
+# MongoDB Data (if running locally)
+data/
+mongodb/
