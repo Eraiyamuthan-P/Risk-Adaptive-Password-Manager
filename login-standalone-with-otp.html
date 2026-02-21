@@ -1182,44 +1182,74 @@
                 const specificReasons = [];
                 const riskDetails = [];
 
+                // LEARNING PHASE: First 3 logins
+                if (riskAssessment.learningPhase) {
+                    const loginNum = (riskAssessment.loginCount || 0) + 1;
+                    return {
+                        level: challengeLevel,
+                        title: '🎓 Learning Phase Active',
+                        message: `This is login ${loginNum}/3. We're building your unique security profile by analyzing your device, typing pattern, and login habits. Email verification is required during this learning period to ensure it's really you.`,
+                        reasons: [`Building Profile (${loginNum}/3)`, 'Email OTP Required', 'Learning Your Patterns'],
+                        specificReasons: [
+                            'Your device fingerprint is being registered',
+                            'Your typing rhythm is being analyzed',
+                            'Your typical login times are being recorded'
+                        ],
+                        riskDetails: [
+                            { factor: 'Learning Phase', status: 'ACTIVE', icon: '🎓' },
+                            { factor: 'Progress', status: `${loginNum}/3`, icon: '📊' }
+                        ],
+                        learningPhase: true,
+                        loginCount: riskAssessment.loginCount
+                    };
+                }
+
                 if (riskAssessment.device === 'HIGH') {
                     reasons.push('new or unfamiliar device');
-                    specificReasons.push('Your device fingerprint doesn\'t match previous successful logins');
+                    specificReasons.push('This device doesn\'t match your registered devices. We need to verify it\'s really you accessing from a new location.');
                     riskDetails.push({ factor: 'Device', status: 'HIGH', icon: '🖥️' });
                 } else if (riskAssessment.device === 'MEDIUM') {
+                    specificReasons.push('Your device has some unfamiliar characteristics');
                     riskDetails.push({ factor: 'Device', status: 'MEDIUM', icon: '🖥️' });
                 }
                 
                 if (riskAssessment.behavior === 'HIGH') {
-                    reasons.push('unusual typing behavior');
-                    specificReasons.push('Your typing pattern differs significantly from your baseline');
+                    reasons.push('unusual typing pattern');
+                    specificReasons.push('Your typing rhythm is significantly different from your established baseline. This could indicate unauthorized access.');
                     riskDetails.push({ factor: 'Typing Pattern', status: 'HIGH', icon: '⌨️' });
                 } else if (riskAssessment.behavior === 'MEDIUM') {
+                    specificReasons.push('Your typing speed or rhythm seems slightly off today');
                     riskDetails.push({ factor: 'Typing Pattern', status: 'MEDIUM', icon: '⌨️' });
                 }
                 
                 if (riskAssessment.time === 'HIGH') {
-                    reasons.push('unusual time of day');
-                    specificReasons.push('You rarely log in at this time. This login is outside your normal hours');
+                    reasons.push('unusual login time');
+                    specificReasons.push('You rarely log in at this hour. This is outside your normal activity window, which could indicate account compromise.');
                     riskDetails.push({ factor: 'Login Time', status: 'HIGH', icon: '🕐' });
                 } else if (riskAssessment.time === 'MEDIUM') {
+                    specificReasons.push('This is an uncommon time for you to log in');
                     riskDetails.push({ factor: 'Login Time', status: 'MEDIUM', icon: '🕐' });
                 }
                 
                 if (riskAssessment.credential === 'HIGH') {
                     reasons.push('recent failed login attempts');
-                    specificReasons.push('Multiple failed login attempts detected recently on your account');
+                    specificReasons.push('Multiple failed password attempts were detected recently. This suggests someone may be trying to access your account.');
                     riskDetails.push({ factor: 'Login History', status: 'HIGH', icon: '⚠️' });
                 } else if (riskAssessment.credential === 'MEDIUM') {
+                    specificReasons.push('There were some failed login attempts recently');
                     riskDetails.push({ factor: 'Login History', status: 'MEDIUM', icon: '⚠️' });
                 }
 
+                // ALL FACTORS LOW - Trusted login
                 if (reasons.length === 0) {
+                    const hasLowFactors = riskDetails.length === 0;
                     return {
                         level: challengeLevel,
-                        title: '✅ Standard Authentication',
-                        message: 'Everything looks normal! Your device is recognized, your behavior matches your profile, and you\'re logging in at a typical time.',
-                        reasons: ['Familiar device', 'Normal behavior', 'Expected time'],
+                        title: '✅ Trusted Login',
+                        message: hasLowFactors 
+                            ? 'Welcome back! Everything checks out perfectly. Your device is recognized, your typing pattern matches your profile, and you\'re logging in at your usual time. No additional verification needed.'
+                            : 'All security checks passed successfully. You can access your vault with just your password.',
+                        reasons: ['Trusted Device', 'Normal Behavior', 'Typical Time', 'Clean History'],
                         specificReasons: [],
                         riskDetails: []
                     };
@@ -1236,20 +1266,29 @@
                 let detailedMessage = '';
                 let otpMessage = '';
                 let faceMessage = '';
+                let title = '';
                 
                 if (challengeLevel === 2) {
-                    otpMessage = `We've detected ${reasons.length === 1 ? 'a' : 'multiple'} unusual factor${reasons.length > 1 ? 's' : ''} in this login attempt. To protect your account, we need to verify your identity with a code sent to your email.`;
-                    detailedMessage = `For your security, we're requesting email verification because we detected: ${reasons.join(', ')}.`;
+                    // Level 2: Email OTP (1 HIGH or 2+ MEDIUM risk factors)
+                    const riskWord = reasons.length === 1 ? 'an unusual pattern' : 'multiple unusual patterns';
+                    title = '🔐 Enhanced Security Check';
+                    otpMessage = `We detected ${riskWord} in this login attempt: ${reasons.join(', ')}. To keep your account secure, please verify your identity with the code sent to your email.`;
+                    detailedMessage = `Additional verification required. We noticed ${reasons.join(' and ')}. A verification code has been sent to your registered email address.`;
                 } else if (challengeLevel === 3) {
-                    faceMessage = `This login shows ${reasons.length} suspicious pattern${reasons.length > 1 ? 's' : ''}. We need facial recognition to ensure it's really you trying to access your account.`;
-                    detailedMessage = `Due to ${reasons.join(' + ')}, we need biometric verification for this login.`;
+                    // Level 3: Face Recognition (2+ HIGH risk factors)
+                    title = '🚨 High-Risk Login Alert';
+                    const threatLevel = reasons.length >= 2 ? 'multiple suspicious indicators' : 'suspicious activity';
+                    faceMessage = `SECURITY ALERT: This login shows ${threatLevel} including ${reasons.join(', ')}. Facial recognition is required to confirm your identity and protect your sensitive data.`;
+                    detailedMessage = `High-risk factors detected: ${reasons.join(' + ')}. For your protection, we need biometric verification before granting access to your vault.`;
                 } else if (challengeLevel === 4) {
-                    detailedMessage = `Critical security alert: ${reasons.join(' + ')}. Multiple authentication factors required.`;
+                    // Level 4: Face + TOTP (severe threat - not currently in use but ready)
+                    title = '⚠️ Critical Security Alert';
+                    detailedMessage = `CRITICAL THREAT: Multiple severe risk factors detected (${reasons.join(' + ')}). Maximum security verification required. Please complete facial recognition AND your TOTP code.`;
                 }
 
                 return {
                     level: challengeLevel,
-                    title: challengeLevel >= 3 ? '🚨 High-Risk Login Detected' : '🔐 Enhanced Security Required',
+                    title: title || (challengeLevel >= 3 ? '🚨 High-Risk Login Detected' : '🔐 Enhanced Security Required'),
                     message: detailedMessage || `Due to ${reasons.join(' + ')}, we need additional verification.`,
                     otpMessage,
                     faceMessage,
