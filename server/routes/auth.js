@@ -1141,4 +1141,61 @@ try {
   }
 });
 
+// =================== RESET LOGIN BEHAVIOR (FOR TESTING) ===================
+/**
+ * Clears all login behavior data for a user account
+ * Used for testing risk-adaptive authentication from scratch
+ * CAUTION: Use only for testing purposes
+ */
+router.post('/reset-login-behavior', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Reset all login tracking fields
+    user.loginAttempts = 0;
+    user.lockUntil = null;
+    user.lastLogin = null;
+    user.emailOTPAttempts = 0;
+    user.emailOTPLockedUntil = null;
+    user.emailOTP = null;
+    user.emailOTPExpires = null;
+    user.emailOTPRequestedAt = null;
+    
+    await user.save();
+
+    console.log(`🧹 Reset login behavior for: ${email}`);
+    console.log('   - Login attempts: 0');
+    console.log('   - Lock status: cleared');
+    console.log('   - Last login: cleared');
+    console.log('   - OTP attempts: 0');
+
+    res.json({
+      success: true,
+      message: `Login behavior reset successfully for ${email}`,
+      clearedFields: [
+        'loginAttempts',
+        'lockUntil',
+        'lastLogin',
+        'emailOTPAttempts',
+        'emailOTPLockedUntil',
+        'emailOTP',
+        'emailOTPExpires',
+        'emailOTPRequestedAt'
+      ]
+    });
+  } catch (error) {
+    console.error('Reset login behavior error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset login behavior' });
+  }
+});
+
 module.exports = router;
