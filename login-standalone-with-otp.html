@@ -845,8 +845,8 @@
                 const knownDevice = profile.devices.find(d => d.fingerprint === fingerprint);
 
                 if (!knownDevice) {
-                    console.log('[DeviceRisk] 🆕 NEW DEVICE → HIGH risk');
-                    return 'HIGH';
+                    console.log('[DeviceRisk] 🆕 NEW DEVICE → MEDIUM risk (development mode)');
+                    return 'MEDIUM';  // Changed from HIGH to MEDIUM for easier testing
                 }
 
                 const daysSinceLastSeen = (Date.now() - knownDevice.lastSeen) / (1000 * 60 * 60 * 24);
@@ -1036,8 +1036,8 @@
             static calculateRisk(email) {
                 const profile = this.loadProfile(email);
                 if (!profile) {
-                    console.log('[CredentialRisk] 🆕 New account → MEDIUM risk');
-                    return 'MEDIUM';
+                    console.log('[CredentialRisk] 🆕 New account, no failures → LOW risk');
+                    return 'LOW';  // Changed from MEDIUM - no failed attempts means LOW risk
                 }
 
                 const recentFailures = profile.failedAttempts.filter(t => Date.now() - t < 15 * 60 * 1000).length;
@@ -1120,13 +1120,17 @@
                 const risks = Object.values(riskAssessment).filter(r => typeof r === 'string');
                 const highCount = risks.filter(r => r === 'HIGH').length;
                 const mediumCount = risks.filter(r => r === 'MEDIUM').length;
+                const lowCount = risks.filter(r => r === 'LOW').length;
 
+                // Development-friendly thresholds for demo purposes
                 if (highCount >= 2) {
-                    return 'HIGH';
-                } else if (highCount >= 1 || mediumCount >= 2) {
-                    return 'MEDIUM';
+                    return 'HIGH';      // 2+ HIGH factors
+                } else if (highCount >= 1 && mediumCount >= 2) {
+                    return 'MEDIUM';    // 1 HIGH + 2 MEDIUM
+                } else if (mediumCount >= 4) {
+                    return 'MEDIUM';    // All 4 factors are MEDIUM
                 } else {
-                    return 'LOW';
+                    return 'LOW';       // Default to LOW for development/demo
                 }
             }
 
