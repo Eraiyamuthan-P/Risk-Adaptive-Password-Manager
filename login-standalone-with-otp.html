@@ -1184,20 +1184,18 @@
 
                 // LEARNING PHASE: First 3 logins
                 if (riskAssessment.learningPhase) {
-                    const loginNum = (riskAssessment.loginCount || 0) + 1;
                     return {
                         level: challengeLevel,
-                        title: '🎓 Learning Phase Active',
-                        message: `This is login ${loginNum}/3. We're building your unique security profile by analyzing your device, typing pattern, and login habits. Email verification is required during this learning period to ensure it's really you.`,
-                        reasons: [`Building Profile (${loginNum}/3)`, 'Email OTP Required', 'Learning Your Patterns'],
+                        title: '🎓 Building Security Profile',
+                        message: 'We\'re establishing your unique security baseline by analyzing your device characteristics, typing patterns, and login habits. Email verification is required during this initial setup to ensure account security.',
+                        reasons: ['Initial Setup', 'Email OTP Required', 'Learning Your Patterns'],
                         specificReasons: [
                             'Your device fingerprint is being registered',
                             'Your typing rhythm is being analyzed',
                             'Your typical login times are being recorded'
                         ],
                         riskDetails: [
-                            { factor: 'Learning Phase', status: 'ACTIVE', icon: '🎓' },
-                            { factor: 'Progress', status: `${loginNum}/3`, icon: '📊' }
+                            { factor: 'Security Profile', status: 'LEARNING', icon: '🎓' }
                         ],
                         learningPhase: true,
                         loginCount: riskAssessment.loginCount
