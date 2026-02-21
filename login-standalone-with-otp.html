@@ -845,8 +845,8 @@
                 const knownDevice = profile.devices.find(d => d.fingerprint === fingerprint);
 
                 if (!knownDevice) {
-                    console.log('[DeviceRisk] 🆕 NEW DEVICE → MEDIUM risk (development mode)');
-                    return 'MEDIUM';  // Changed from HIGH to MEDIUM for easier testing
+                    console.log('[DeviceRisk] 🆕 NEW DEVICE → HIGH risk');
+                    return 'HIGH';  // Reverted back to HIGH for security
                 }
 
                 const daysSinceLastSeen = (Date.now() - knownDevice.lastSeen) / (1000 * 60 * 60 * 24);
@@ -1088,6 +1088,29 @@
                 console.log('Email:', email);
                 console.log('═══════════════════════════════════════════════');
 
+                // CHECK LEARNING PHASE: First 3 logins always require OTP
+                const timeProfile = TimeRiskModule.loadProfile(email);
+                const isLearningPhase = !timeProfile || timeProfile.totalLogins < 3;
+                
+                if (isLearningPhase) {
+                    const loginCount = timeProfile ? timeProfile.totalLogins : 0;
+                    console.log(`🎓 LEARNING PHASE: Login ${loginCount + 1}/3 → Forcing OTP for security`);
+                    console.log('═══════════════════════════════════════════════');
+                    
+                    return {
+                        riskLevel: 'MEDIUM',
+                        challengeLevel: 2,  // Always Email OTP during learning
+                        details: {
+                            device: 'LEARNING',
+                            behavior: 'LEARNING',
+                            time: 'LEARNING',
+                            credential: 'LEARNING',
+                            learningPhase: true,
+                            loginCount: loginCount
+                        }
+                    };
+                }
+
                 const deviceRisk = await DeviceRiskModule.calculateRisk(email);
                 const behaviorRisk = BehaviorRiskModule.calculateRisk(typingSample, email);
                 const timeRisk = TimeRiskModule.calculateRisk(email);
@@ -1120,17 +1143,14 @@
                 const risks = Object.values(riskAssessment).filter(r => typeof r === 'string');
                 const highCount = risks.filter(r => r === 'HIGH').length;
                 const mediumCount = risks.filter(r => r === 'MEDIUM').length;
-                const lowCount = risks.filter(r => r === 'LOW').length;
 
-                // Development-friendly thresholds for demo purposes
+                // Standard quorum logic (post-learning phase)
                 if (highCount >= 2) {
-                    return 'HIGH';      // 2+ HIGH factors
-                } else if (highCount >= 1 && mediumCount >= 2) {
-                    return 'MEDIUM';    // 1 HIGH + 2 MEDIUM
-                } else if (mediumCount >= 4) {
-                    return 'MEDIUM';    // All 4 factors are MEDIUM
+                    return 'HIGH';      // 2+ HIGH factors → Face Auth
+                } else if (highCount >= 1 || mediumCount >= 2) {
+                    return 'MEDIUM';    // 1 HIGH OR 2+ MEDIUM → Email OTP
                 } else {
-                    return 'LOW';       // Default to LOW for development/demo
+                    return 'LOW';       // Everything else → Password only
                 }
             }
 
