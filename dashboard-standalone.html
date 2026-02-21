@@ -1274,8 +1274,14 @@
                 'Logout',
                 'Are you sure you want to logout? All unsaved data will be cleared from this browser.',
                 () => {
-                    localStorage.clear();
+                    // Clear only authentication data, preserve behavioral profiles
+                    const keysToRemove = ['token', 'user', 'vaultKey', 'salt'];
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
+                    
+                    // Clear session data
                     sessionStorage.clear();
+                    
+                    console.log('✅ Logged out - Behavioral profiles preserved');
                     window.location.href = 'login-standalone-with-otp.html';
                 }
             );
