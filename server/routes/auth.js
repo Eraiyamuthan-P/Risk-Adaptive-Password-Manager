@@ -14,6 +14,11 @@ const useragent = require('useragent');
 // Function to send login email
 // Updated Login Alert using Brevo API
 async function sendLoginAlert(email, ip, device, location) {
+    // Format location with region if available
+    const locationStr = location.region 
+        ? `${location.city}, ${location.region}, ${location.country}` 
+        : `${location.city}, ${location.country}`;
+    
     const htmlContent = `
     <div style="font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 500px; margin: auto; border-top: 6px solid #ef4444; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
         <div style="padding: 30px; background-color: #ffffff;">
@@ -22,7 +27,8 @@ async function sendLoginAlert(email, ip, device, location) {
             
             <div style="background-color: #fef2f2; border-radius: 8px; padding: 20px; margin: 25px 0;">
                 <p style="margin: 0 0 10px 0; color: #374151;"><strong>Device:</strong> ${device}</p>
-                <p style="margin: 0 0 10px 0; color: #374151;"><strong>Location:</strong> ${location.city}, ${location.country}</p>
+                <p style="margin: 0 0 10px 0; color: #374151;"><strong>Location:</strong> ${locationStr}</p>
+                ${location.isp ? `<p style="margin: 0 0 10px 0; color: #6b7280; font-size: 13px;"><strong>ISP:</strong> ${location.isp}</p>` : ''}
                 <p style="margin: 0 0 10px 0; color: #374151;"><strong>IP Address:</strong> ${ip}</p>
                 <p style="margin: 0; color: #374151;"><strong>Time:</strong> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</p>
             </div>
@@ -362,7 +368,7 @@ router.post('/login', [
     const agent = useragent.parse(req.headers["user-agent"]);
     const device = `${agent.family} on ${agent.os.family}`;
 
-    let location = { city: "Unknown", country: "Unknown" };
+    let location = { city: "Unknown", region: "", country: "Unknown", isp: "" };
     
     if (isLocalhost) {
       // For localhost, use a default location or skip IP lookup
@@ -372,19 +378,22 @@ router.post('/login', [
     } else {
       console.log(`🔍 Looking up location for IP: ${userIP}`);
       
-      // Try primary API: ipapi.co
+      // Try primary API: ipapi.co (more accurate, includes region)
       try {
         const response = await axios.get(`https://ipapi.co/${userIP}/json/`, {
           timeout: 5000,
           headers: { 'User-Agent': 'Password-Manager-Node' }
         });
         
-        console.log('📡 IP API Response:', JSON.stringify(response.data).substring(0, 200));
+        console.log('📡 IP API Response:', JSON.stringify(response.data).substring(0, 300));
         
         if (response.data && !response.data.error && response.data.city) {
           location.city = response.data.city || "Unknown";
+          location.region = response.data.region || ""; // State/Province
           location.country = response.data.country_name || "Unknown";
-          console.log(`📍 Location detected (ipapi.co): ${location.city}, ${location.country}`);
+          location.isp = response.data.org || ""; // ISP/Organization
+          console.log(`📍 Location detected (ipapi.co): ${location.city}, ${location.region}, ${location.country}`);
+          console.log(`📡 ISP: ${location.isp}`);
         } else {
           throw new Error('Invalid response from ipapi.co');
         }
@@ -397,12 +406,15 @@ router.post('/login', [
             timeout: 5000
           });
           
-          console.log('📡 Fallback API Response:', JSON.stringify(fallbackResponse.data).substring(0, 200));
+          console.log('📡 Fallback API Response:', JSON.stringify(fallbackResponse.data).substring(0, 300));
           
           if (fallbackResponse.data && fallbackResponse.data.status === 'success') {
             location.city = fallbackResponse.data.city || "Unknown";
+            location.region = fallbackResponse.data.regionName || ""; // State name
             location.country = fallbackResponse.data.country || "Unknown";
-            console.log(`📍 Location detected (ip-api.com): ${location.city}, ${location.country}`);
+            location.isp = fallbackResponse.data.isp || ""; // Internet Service Provider
+            console.log(`📍 Location detected (ip-api.com): ${location.city}, ${location.region}, ${location.country}`);
+            console.log(`📡 ISP: ${location.isp}`);
           } else {
             console.error('❌ Fallback API also failed');
           }
@@ -875,8 +887,8 @@ router.post('/verify-login-otp', async (req, res) => {
     // 1. Capture the real User IP from the Hugging Face proxy
     const userIP = req.headers["x-forwarded-for"]?.split(',')[0]?.trim() || req.ip;
 
-    // 2. Initialize location as Unknown
-    let location = { city: "Unknown", country: "Unknown" }; 
+    // 2. Initialize location with detailed fields
+    let location = { city: "Unknown", region: "", country: "Unknown", isp: "" }; 
     
     // Handle localhost
     const isLocalhost = userIP === '::1' || userIP === '127.0.0.1' || userIP === '::ffff:127.0.0.1';
@@ -889,7 +901,7 @@ router.post('/verify-login-otp', async (req, res) => {
       console.log(`🔍 Looking up location for IP (OTP verify): ${userIP}`);
       
       try {
-        // 3. Attempt to fetch live geolocation data from primary API
+        // 3. Attempt to fetch live geolocation data from primary API with region/ISP
         const response = await axios.get(`https://ipapi.co/${userIP}/json/`, {
           timeout: 5000,
           headers: { 'User-Agent': 'Password-Manager-Node' }
@@ -898,8 +910,11 @@ router.post('/verify-login-otp', async (req, res) => {
         // 4. Only update if the API returns valid data
         if (response.data && !response.data.error && response.data.city) {
           location.city = response.data.city || "Unknown";
+          location.region = response.data.region || "";
           location.country = response.data.country_name || "Unknown";
-          console.log(`📍 Location detected (OTP): ${location.city}, ${location.country}`);
+          location.isp = response.data.org || "";
+          console.log(`📍 Location detected (OTP): ${location.city}, ${location.region}, ${location.country}`);
+          console.log(`📡 ISP: ${location.isp}`);
         } else {
           throw new Error('Invalid response from ipapi.co');
         }
@@ -914,8 +929,11 @@ router.post('/verify-login-otp', async (req, res) => {
           
           if (fallbackResponse.data && fallbackResponse.data.status === 'success') {
             location.city = fallbackResponse.data.city || "Unknown";
+            location.region = fallbackResponse.data.regionName || "";
             location.country = fallbackResponse.data.country || "Unknown";
-            console.log(`📍 Location detected (OTP - fallback): ${location.city}, ${location.country}`);
+            location.isp = fallbackResponse.data.isp || "";
+            console.log(`📍 Location detected (OTP - fallback): ${location.city}, ${location.region}, ${location.country}`);
+            console.log(`📡 ISP: ${location.isp}`);
           }
         } catch (fallbackError) {
           console.error(`❌ Fallback IP lookup failed (OTP): ${fallbackError.message}`);
