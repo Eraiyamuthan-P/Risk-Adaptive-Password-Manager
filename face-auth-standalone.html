@@ -795,6 +795,12 @@
                 if (data.user) {
                     localStorage.setItem('user', JSON.stringify(data.user));
                     if (data.user.salt) localStorage.setItem('salt', data.user.salt);
+                    
+                    // For face auth, we need to handle vault key access
+                    // Store the encrypted vault key for dashboard access
+                    if (data.user.encryptedVaultKey) {
+                        sessionStorage.setItem('encryptedVaultKey', data.user.encryptedVaultKey);
+                    }
                 }
                 
                 // Clean up sessionStorage after successful verification
@@ -802,8 +808,11 @@
                 sessionStorage.removeItem('pendingLoginContext');
                 
                 stopCamera();
-                scanScreen.classList.add('hidden');
-                passwordScreen.classList.add('show');
+                
+                // Redirect directly to dashboard after successful face authentication
+                setTimeout(() => {
+                    window.location.href = 'dashboard-standalone.html';
+                }, 500);
             }
         } else {
             throw new Error(data.message || 'Face authentication failed');
